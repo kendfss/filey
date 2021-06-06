@@ -1,0 +1,5 @@
+dill
+filetype
+pyperclip
+send2trash
+sl4ng

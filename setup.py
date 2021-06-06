@@ -5,11 +5,10 @@ with open('README.md', 'r') as fob:
 
 setup(
     name='filey',
-    version='0.0.1',
-    author='Kenneth Elisandro',
-    author_email='eli2and40@tilde.club',
-    url='https://tildegit.org/eli2and40/cabinet',
-    # packages=find_packages(),
+    version='0.0.2',
+    author='Kenneth Sabalo',
+    author_email='kennethsantanasablo@gmail.com',
+    url='https://tildegit.org/eli2and40/filey',
     packages=['filey'],
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -18,15 +17,15 @@ setup(
     ],
     long_description=long_description,
     long_description_content_type='text/markdown',
-    keywords='utilities productivity',
+    keywords='utilities operating path file system',
     license='MIT',
     requires=[
-        'filetype',
-        'audio_metadata',
-        'send2trash',
-        'sl4ng'
+        "audio_metadata",
+        "dill",
+        "filetype",
+        "send2trash",
+        "sl4ng",
+        "pypeclip",
     ],
-    # py_modules=['filey'],
-    python_requires='>=3.8',
-
+    python_requires='>3.9',
 )
