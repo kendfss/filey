@@ -1,4 +1,4 @@
-# __all__ = "discard unarchive create_enter audio_or_video namespacer isempty move send2trash ffplay trim move_file delevel convert cat".split()
+# __all__ = "discard unarchive create_enter audio_or_video NameSpacer namespacer isempty move send2trash ffplay trim move_file delevel convert cat".split()
 __all__ = "mcd mv move_file rm ffplay convert cat".split()
 
 from itertools import filterfalse
@@ -30,44 +30,39 @@ def delevel(path:str, steps:int=1) -> str:
         steps -= 1
     return path if not path.endswith(':') else path+os.sep
 
-def namespacer(path:str, sep:str='_', start:int=2) -> str:
+
+
+class NameSpacer:
     """
-    Returns a unique version of a given string by appending an integer
+    Create an incrementation of a path if it already exists on the local system
     
-    example:
-        tree:
-            /folder
-                /file.ext
-                /file_2.ext
-        
-        >>> namespacer('file', sep='-', start=2)
-        file-2.ext
-        >>> namespacer('file', sep='_', start=2)
-        file_3.ext
-        >>> namespacer('file', sep='_', start=0)
-        file_0.ext
+    params
+        format
+            a formattable string amenable to both "name" and "index" key words
+    
+    examples
+        >>> my_path = "c:/users"
+        >>> NameSpacer()(my_path)
+        c:/users_2
+        >>> NameSpacer("{name} ({index})")(my_path)
+        c:/users (2)
     """
-    id = start
-    oldPath = path[:]
-    while os.path.exists(path):
-        newPath = list(os.path.splitext(path))
-        if sep in newPath[0]:
-            if newPath[0].split(sep)[-1].isnumeric():
-                # print('case1a')
-                id = newPath[0].split(sep)[-1]
-                newPath[0] = newPath[0].replace(f'{sep}{id}', f'{sep}{str(int(id)+1)}')
-                path = ''.join(newPath)
-            else:
-                # print('case1b')
-                newPath[0] += f'{sep}{id}'
-                path = ''.join(newPath)
-                id += 1
-        else:
-            # print('case2')
-            newPath[0] += f'{sep}{id}'
-            path = ''.join(newPath)
-            id += 1
-    return path
+    def __init__(self, format:str="_{index}"):
+        self.format = format
+    def __call__(self, path:str, index:int=2) -> str:
+        if not os.path.exists(path):
+            return path
+        if os.path.exists(new:=self.new(path, index)):
+            return self(path, index + 1)
+        return new
+    def new(self, path:str, index:int) -> str:
+        weirdos = ".tar".split()
+        name, ext = os.path.splitext(path)
+        while any(name.endswith(weirdo:=w) for w in weirdos):
+            if name != (name:=name.removesuffix(weirdo)): 
+                ext = weirdo + ext
+        return name + self.format.format(index=index) + ext
+namespacer = NameSpacer()
 
 def trim(path:str, edge:str=os.sep) -> str:
     """
@@ -123,7 +118,7 @@ def create_enter(*args:[str, Iterable[str]], go_back:bool=False, recursive:bool=
     """
     home = os.getcwd()
     for arg in flat(args):
-        arg = nameSpacer(arg) if arg!='..' and not overwrite else arg
+        arg = namespacer(arg) if arg!='..' and not overwrite else arg
         os.makedirs(arg, exist_ok=exist_ok)
         os.chdir(arg if recursive else home)
     last_stop = home if go_back else os.getcwd()
@@ -150,9 +145,9 @@ def move(source:str, dest:str, make_dest:bool=False) -> str:
         if not make_dest:
             raise ValueError(f"Destination's path doesn't point to a directory")
         os.makedirs(dest, exist_ok=True)
-    root, name = os.path.split(path)
+    root, name = os.path.split(source)
     new = os.path.join(dest, name)
-    os.rename(path, new)
+    os.rename(source, new)
     return new
 mv = move
 
@@ -337,7 +332,7 @@ def isempty(path:str, make:bool=False) -> bool:
         with open(path, 'rb') as f:
             return not bool(len(tuple(i for i in f)))
     elif os.path.isdir(path):
-        return not bool(len(os.listdir(file)))
+        return not bool(len(os.listdir(path)))
     elif make:
         if os.path.splitext(path)[-1]:
             x = open(path, 'x')

@@ -27,10 +27,10 @@ TODO
     Caches for pickling (backup simplification)
     Remove Size from repr for Directories. Large ones take too long to initialize
 """
-__all__ = 'forbiddens Thing Place Thing Path Address Directory Folder File Library'.split()
+__all__ = 'forbiddens Thing Place Thing Path Address Directory Folder File Library Scanner'.split()
 
 from itertools import chain
-from typing import Dict, Iterable, Iterator, List, Sequence, TypeAlias
+from typing import Iterable, Iterator, TypeAlias, Callable
 from warnings import warn
 import io, os, pathlib, re, sys, shutil
 
@@ -155,7 +155,8 @@ class Thing:
         name = type(self).__name__.split('.')[-1]
         size = f", size={self.size}" if self.isfile or isinstance(self, File) else ''
         real = (f", real={self.exists}", '')[self.exists]
-        return f"{name}(name={self.name}, dir={self.up.name}{size}{real})"
+        up = f", dir={self.dir.name}" if self.dir.path != self.path else ''
+        return f"{name}(name={self.name}{up}{size}{real})"
     
     def create(self, content:str|bytes|bytearray=None, raw:bool=False, exist_ok:bool=True, mode:int=511) -> _Path:
         """
@@ -206,7 +207,7 @@ class Thing:
         Determine if self.path points to a file or folder and create the corresponding object
         """
         if self.isfile:
-            return Thing(self.path)
+            return File(self.path)
         elif self.isdir:
             return Place(self.path)
         else:
@@ -223,17 +224,18 @@ class Thing:
         """
         Return the name of the referent
         """
-        return os.path.split(self.path)[1]
+        path, nome = os.path.split(self.path)
+        return nome if nome else path
     
     @property
-    def ancestors(self) -> tuple:
+    def ancestors(self) -> tuple[_Place]:
         """
         Return consecutive ADirs until the ADrive is reached
         """
         level = []
         p = self.path
-        while p != delevel(p):
-            p = delevel(p)
+        while p != shell.delevel(p):
+            p = shell.delevel(p)
             level.append(p)
         return tuple(Thing(i).obj for i in level)[::-1]
     @property
@@ -243,7 +245,7 @@ class Thing:
         """
         return (i for i in self.up if isinstance(i, type(self)))
     @property
-    def neighbours(self) -> tuple[_File, _Place]:
+    def neighbours(self) -> tuple[_Placefile]:
         """
         Everything in the same Place
         """
@@ -269,13 +271,15 @@ class Thing:
     @property
     def ancestry(self) -> str:
         """
-        A fancy representation of the tree from the apparent drive up to the given path
+        A nice representation of the tree from the apparent drive up to the given path
         """
-        print(f'ancestry({self.name})')
+        tree = f'ancestry({self.name})'
+        print(tree)
         ancs = list(self.ancestors[1:])
         ancs.append(self.path)
         for i, anc in enumerate(ancs):
-            print('\t' + ('', '.' * i)[i > 0] + i * '  ' + [i for i in str(anc).split(os.sep) if i][-1] + '/')
+            line = '\n\t' + ('', '.' * i)[i > 0] + i * '  ' + [i for i in str(anc).split(os.sep) if i][-1] + '/'
+            print(line)
         return self
     @property
     def isempty(self):
@@ -308,7 +312,7 @@ class Thing:
             path
                 return (True -> string, False -> Thing-like object)
         """
-        return delevel(self.path, steps) if path else Place(delevel(self.path, steps))
+        return shell.delevel(self.path, steps) if path else Place(shell.delevel(self.path, steps))
     def touch(self) -> _Path:
         """
         Implements the unix command 'touch', which updates the 'date modified' of the content at the path
@@ -346,7 +350,7 @@ class Thing:
         else:
             new = self.path
         new = shell.namespacer(new, sep=sep)
-        os.makedirs(delevel(new), exist_ok=True)
+        os.makedirs(shell.delevel(new), exist_ok=True)
         copier(self.path, new)
         out = Thing(new).obj
         return out.touch() if touch else out
@@ -459,16 +463,19 @@ class Place(Thing):
     Place('.') == Place(os.getcwd())
     """
     def __init__(self, path:str='NewPlace'):
-        if path=='.':
-            path = os.getcwd()
-        elif path == 'NewPlace':
-            path = shell.namespacer(path)
-        elif path == '~':
-            path = os.path.expanduser(path)
-        path = os.path.abspath(shell.trim(path))
         if os.path.isfile(path):
             raise ValueError("Given path corresponds to a file")
-        self.path = os.path.realpath(path)
+        if path.startswith(r"\\wsl$"):
+            self.path = path
+        else:
+            if path=='.':
+                path = os.getcwd()
+            elif path == 'NewPlace':
+                path = shell.namespacer(path)
+            elif path == '~':
+                path = os.path.expanduser(path)
+            path = os.path.abspath(shell.trim(path))
+            self.path = os.path.realpath(path)
         super(type(self), self).__init__(path)
         self.index = -1
     def __len__(self):
@@ -480,7 +487,7 @@ class Place(Thing):
         return len(os.listdir(self.path)) > 0
     def __iter__(self) -> Iterator[_Placefile]:
         return self
-    def __next__(self) -> Sequence[_Placefile]:
+    def __next__(self) -> _Placefile:
         if self.index<len(self)-1:
             self.index += 1
             return self.content[self.index]
@@ -626,7 +633,7 @@ class Place(Thing):
         return not self.depth
     
     
-    def add(self, other:Address, copy:bool=False) -> _Place:
+    def add(self, other:Thing, copy:bool=False) -> _Place:
         """
         Introduce new elements. Send an address-like object to self.
         """
@@ -684,6 +691,87 @@ class Audio(File):
     @property
     def title(self):
         return self.tags['title']
+
+class Scanner:
+    """
+    Object which scans text files, and their names, for given keywords
+    
+    example
+        >>> s = Scanner("f = ma")
+        >>> s("./principia.txt", strict=True)
+        True
+        >>> s("./bible.txt", strict=True)
+        False
+        
+        >>> s("./principia.txt", strict=False)
+        True
+        >>> s("./bible.txt", strict=False)
+        True
+    """
+    def __init__(self, keywords:str, mode:str='r', strict:bool=True, prescaped:bool=False, case:bool=False, opener:Callable=open, lines:bool=True):
+        """
+        params:
+            keywords
+                terms to search for
+            mode
+                'r' or 'rb'
+            strict
+                True -> search for words 
+                False -> clauses
+            prescaped
+                whether or not terms have already been regex escaped
+            case
+                true -> case sensitive
+            opener
+                must return an object with a "readlines" or "read" method  (depends on lines)
+            lines
+                wheter or not to scan by lines
+        """
+        self.__case = case
+        self.__keywords = keywords
+        self.opener = opener
+        self.lines = lines
+        self.mode = mode
+        self.strict = strict
+        self.prescaped = prescaped
+    @property
+    def keywords(self):
+        """
+        handles any necessary escaping
+        """
+        return re.escape(self.__keywords) if not self.prescaped else self.__keywords
+    @property
+    def case(self):
+        """
+        standardize the case-fold setting
+        """
+        return re.I if not self.__case else 0
+    @property
+    def pattern(self):
+        """
+        compile the search pattern
+        """
+        return re.compile(
+            (
+                '|'.join(self.keywords.split()), 
+                self.keywords
+            )[self.strict], 
+            self.case
+        )
+    def __call__(self, path:str, lines:bool=None) -> bool:
+        """
+        Scan a file at a given path for a predefined word/clause, you can also override the default lines argument
+        """
+        if isinstance(lines, type(None)):
+            lines = self.lines
+        try:
+            with self.opener(path, self.mode) as fob:
+                method = (fob.read, fob.readlines)[lines]
+                return self.pattern.search(path) or any(map(self.pattern.search, method()))
+        except UnicodeDecodeError:
+            return False
+
+
     
 if __name__ == '__main__':
     # show(locals().keys())

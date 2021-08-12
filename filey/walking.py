@@ -7,6 +7,9 @@ from itertools import permutations, chain
 import os, re
 from sl4ng import pop, show, multisplit, join, mainame, eq
 
+
+LOCKOUTS = "Config.Msi*System Volume Information*$Recycle.Bin*C:\\Users\\Administrator".lower().split('*')
+
 def walk(root:str='.', dirs:bool=False, absolute:bool=True) -> Iterator[str]:
     """
     Walk a directory's tree yielding paths to any files and/or folders along the way
@@ -29,7 +32,7 @@ def walk(root:str='.', dirs:bool=False, absolute:bool=True) -> Iterator[str]:
     root = (str, os.path.realpath)[absolute](str(root))
     for name in os.listdir(root):
         path = os.path.join(root, name)
-        if os.path.isdir(path):
+        if os.path.isdir(path) and not name.lower() in LOCKOUTS:
             if dirs:
                 yield (name, path)[absolute]
             yield from walk(path, dirs=dirs, absolute=absolute)
@@ -67,12 +70,14 @@ def files(root:str='.', exts:str='', negative:bool=False, absolute:bool=True) ->
     root = (str, os.path.realpath)[absolute](str(root))
     pat = parse_extensions(exts)
     predicate = lambda x: not bool(pat.search(x)) if negative else bool(pat.search(x))
-    for name in os.listdir(root):
-        path = os.path.join(root, name)
-        if os.path.isdir(path):
-            yield from files(path, exts=exts, negative=negative, absolute=absolute)
-        elif predicate(path):
-            yield (name, path)[absolute]
+    name = os.path.split(root)[1]
+    if not (name.lower() in LOCKOUTS or root.lower() in LOCKOUTS):
+        for name in os.listdir(root):
+            path = os.path.join(root, name)
+            if os.path.isdir(path) and not name.lower() in LOCKOUTS:
+                yield from files(path, exts=exts, negative=negative, absolute=absolute)
+            elif predicate(path):
+                yield (name, path)[absolute]
 
 def folders(root:str='.', absolute:bool=True) -> Iterator[str]:
     """
@@ -94,7 +99,7 @@ def folders(root:str='.', absolute:bool=True) -> Iterator[str]:
     root = (str, os.path.realpath)[absolute](str(root))
     for name in os.listdir(root):
         path = os.path.join(root, name)
-        if os.path.isdir(path):
+        if os.path.isdir(path) and not name.lower() in LOCKOUTS:
             yield (name, path)[absolute]
             yield from folders(path, absolute=absolute)
 
