@@ -1,6 +1,6 @@
 import os, sys, time
 
-user_scripts = r'e:\projects\monties'
+user_scripts = "/Users/kendfss/programs/scripts"
 shortcuts = {
     'music': os.path.join(os.path.expanduser('~'), 'music', 'collection'),
     'images': os.path.join(os.path.expanduser('~'), 'pictures'),

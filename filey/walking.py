@@ -8,19 +8,22 @@ import os, re
 from sl4ng import pop, show, multisplit, join, mainame, eq
 
 
-LOCKOUTS = "Config.Msi*System Volume Information*$Recycle.Bin*C:\\Users\\Administrator".lower().split('*')
+LOCKOUTS = "Config.Msi*System Volume Information*$Recycle.Bin*C:\\Users\\Administrator*com.apple.HomeKit".lower().split(
+    '*'
+)
 
-def walk(root:str='.', dirs:bool=False, absolute:bool=True) -> Iterator[str]:
+
+def walk(root: str = '.', dirs: bool = False, absolute: bool = True) -> Iterator[str]:
     """
     Walk a directory's tree yielding paths to any files and/or folders along the way
-    This will always yield files. 
+    This will always yield files.
     If you only want directories, look for the "folders" function in filey.utils.walkers
-    
+
     Caution:  if you pass a relative pathname for top, don't change the
     current working directory between resumptions of walk.  walk never
     changes the current directory, and assumes that the client doesn't
     either. - taken from os.walk documentation
-    
+
     Params
         root: str|pathlike|Place
             path to starting directory
@@ -39,9 +42,10 @@ def walk(root:str='.', dirs:bool=False, absolute:bool=True) -> Iterator[str]:
         else:
             yield (name, path)[absolute]
 
-def parse_extensions(extensions:str) -> re.Pattern:
+
+def parse_extensions(extensions: str) -> re.Pattern:
     """
-    Create a regex parser to check for file extensions. 
+    Create a regex parser to check for file extensions.
         Note: Separate extensions by one of
             [',', '`', '*', ' ']
     """
@@ -50,16 +54,19 @@ def parse_extensions(extensions:str) -> re.Pattern:
     pat = re.compile(pattern, re.I)
     return pat
 
-def files(root:str='.', exts:str='', negative:bool=False, absolute:bool=True) -> Iterator[str]:
+
+def files(
+    root: str = '.', exts: str = '', negative: bool = False, absolute: bool = True
+) -> Iterator[str]:
     """
     Search for files along a directory's tree.
     Also (in/ex)-clude any whose extension satisfies the requirement
-        
+
     Params
         root: str|pathlike|Place
             path to starting directory
         exts
-            extensions of interest. 
+            extensions of interest.
             you can pass more than one extension at a time by separating them with one of the following:
                 [',', '`', '*', ' ']
         negative
@@ -79,16 +86,17 @@ def files(root:str='.', exts:str='', negative:bool=False, absolute:bool=True) ->
             elif predicate(path):
                 yield (name, path)[absolute]
 
-def folders(root:str='.', absolute:bool=True) -> Iterator[str]:
+
+def folders(root: str = '.', absolute: bool = True) -> Iterator[str]:
     """
     Search for files along a directory's tree.
     Also (in/ex)-clude any whose extension satisfies the requirement
-        
+
     Params
         root: str|pathlike|Place
             path to starting directory
         exts
-            extensions of interest. 
+            extensions of interest.
             you can pass more than one extension at a time by separating them with any of the following:
                 [',', '`', '*', ' ']
         negative
@@ -103,7 +111,8 @@ def folders(root:str='.', absolute:bool=True) -> Iterator[str]:
             yield (name, path)[absolute]
             yield from folders(path, absolute=absolute)
 
-def __term_perms(terms:str, case:int, tight:bool) -> re.Pattern:
+
+def __term_perms(terms: str, case: int, tight: bool) -> re.Pattern:
     """
     compute the regex pattern for posible permutations of search terms
     """
@@ -115,7 +124,17 @@ def __term_perms(terms:str, case:int, tight:bool) -> re.Pattern:
     return re.compile("|".join(rack), case)
 
 
-def search_iter(iterable:str, terms:Iterable[str], exts:str='', case:bool=False, negative:bool=False, dirs:int=0, strict:int=1, regex:bool=False, names:bool=True) -> Iterator[str]:
+def search_iter(
+    iterable: str,
+    terms: Iterable[str],
+    exts: str = '',
+    case: bool = False,
+    negative: bool = False,
+    dirs: int = 0,
+    strict: int = 1,
+    regex: bool = False,
+    names: bool = True,
+) -> Iterator[str]:
     """
     Find files matching the given terms within a directory's tree
     Params
@@ -152,27 +171,42 @@ def search_iter(iterable:str, terms:Iterable[str], exts:str='', case:bool=False,
     sep = "[\\ _\\-]*" if tight else "(.)*"
     scope = (str, lambda x: os.path.split(x)[1])[names]
     case = 0 if case else re.I
-    
+
     expat = parse_extensions(exts)
-    tepat = {
-        0: re.compile("|".join(map(re.escape, terms.split())), case),
-        1: __term_perms(terms, case, 0),
-        2: __term_perms(terms, case, 1),
-        3: re.compile(sep.join(map(re.escape, terms)), case),
-        4: re.compile(sep.join(map(re.escape, terms)), case),
-        5: re.compile(terms, case)
-    }[strict] if not regex else re.compile(terms, case)
-    
+    tepat = (
+        {
+            0: re.compile("|".join(map(re.escape, terms.split())), case),
+            1: __term_perms(terms, case, 0),
+            2: __term_perms(terms, case, 1),
+            3: re.compile(sep.join(map(re.escape, terms)), case),
+            4: re.compile(sep.join(map(re.escape, terms)), case),
+            5: re.compile(terms, case),
+        }[strict]
+        if not regex
+        else re.compile(terms, case)
+    )
+
     predicate = (
         lambda i: tepat.search(i) and expat.search(i),
         lambda i: not (tepat.search(i) or expat.search(i)),
     )[negative]
-    
+
     for i in iterable:
         if predicate(scope(i)):
             yield i
 
-def search(root:str, terms:Iterable[str], exts:str='', case:bool=False, negative:bool=False, dirs:int=0, strict:int=1, regex:bool=False, names:bool=True) -> Iterator[str]:
+
+def search(
+    root: str,
+    terms: Iterable[str],
+    exts: str = '',
+    case: bool = False,
+    negative: bool = False,
+    dirs: int = 0,
+    strict: int = 1,
+    regex: bool = False,
+    names: bool = True,
+) -> Iterator[str]:
     """
     Find files matching the given terms within a directory's tree
     Uses linear search
@@ -206,22 +240,22 @@ def search(root:str, terms:Iterable[str], exts:str='', case:bool=False, negative
             True -> only yield results whose names match
             False -> yield results who match at any level
     """
-    func = {
-        0: files,
-        1: walk,
-        2: folders,
-    }[dirs]
+    func = {0: files, 1: walk, 2: folders}[dirs]
     kwargs = {
-        0: { "exts": exts, "negative": negative, "absolute": True, },
-        1: { "dirs": True, "absolute": True, },
-        2: { "absolute": True, },
+        0: {"exts": exts, "negative": negative, "absolute": True},
+        1: {"dirs": True, "absolute": True},
+        2: {"absolute": True},
     }[dirs]
-    
+
     yield from search_iter(
-        (i for i in func(root, **kwargs)), 
-        terms=terms, exts=exts, case=case, 
-        negative=negative, dirs=dirs, 
-        strict=strict, names=names
+        (i for i in func(root, **kwargs)),
+        terms=terms,
+        exts=exts,
+        case=case,
+        negative=negative,
+        dirs=dirs,
+        strict=strict,
+        names=names,
     )
 
 
@@ -236,11 +270,11 @@ if __name__ == "__main__":
     # print(all(map(os.path.exists, box)))
     # print(__file__ in box)
     # show(box, 0, 1)
-    
+
     # box = [*walk(folder, dirs=False, absolute=True)]
     # box2 = [*files(folder, exts='', absolute=True)]
     # print(all(i in box2 for i in box) and all(i in box for i in box2))
-    
+
     # exts = 'jpg .jpeg pdf'
     # show([*files(folder, exts=exts, negative=False, absolute=True)])
 
@@ -248,8 +282,7 @@ if __name__ == "__main__":
     # box2 = [*files(folder, exts=exts, negative=False, absolute=True)]
     # box3 = [*files(folder, exts=exts, negative=True, absolute=True)]
     # print(eq(map(sorted, (box2+box3, box))))
-    
-    
+
     # box4 = [*folders(folder, True)]
     # show(box4, 0, 1)
     # show(search(folder, '__init__'))

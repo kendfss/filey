@@ -130,3 +130,5 @@ dmypy.json
 
 filey/testdir
 readme_test.py
+
+.DS_Store

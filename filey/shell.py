@@ -11,7 +11,7 @@ from sl4ng import shuffle, flat
 import filetype as ft, audio_metadata as am, pyperclip as pc
 
 
-def delevel(path:str, steps:int=1) -> str:
+def delevel(path: str, steps: int = 1) -> str:
     """
     This will climb the given path tree by the given number of steps.
     No matter how large the number of steps, it will stop as soon as it reaches the root.
@@ -25,21 +25,20 @@ def delevel(path:str, steps:int=1) -> str:
     dependencies: os.sep
     """
     path = os.path.normpath(path)
-    while steps and (len(path.split(os.sep))-1):
+    while steps and (len(path.split(os.sep)) - 1):
         path = os.sep.join((path.split(os.sep)[:-1]))
         steps -= 1
-    return path if not path.endswith(':') else path+os.sep
-
+    return path if not path.endswith(':') else path + os.sep
 
 
 class NameSpacer:
     """
     Create an incrementation of a path if it already exists on the local system
-    
+
     params
         format
             a formattable string amenable to both "name" and "index" key words
-    
+
     examples
         >>> my_path = "c:/users"
         >>> NameSpacer()(my_path)
@@ -47,36 +46,45 @@ class NameSpacer:
         >>> NameSpacer("{name} ({index})")(my_path)
         c:/users (2)
     """
-    def __init__(self, format:str="_{index}"):
+
+    def __init__(self, format: str = "_{index}"):
         self.format = format
-    def __call__(self, path:str, index:int=2) -> str:
+
+    def __call__(self, path: str, index: int = 2) -> str:
         if not os.path.exists(path):
             return path
-        if os.path.exists(new:=self.new(path, index)):
+        if os.path.exists(new := self.new(path, index)):
             return self(path, index + 1)
         return new
-    def new(self, path:str, index:int) -> str:
+
+    def new(self, path: str, index: int) -> str:
         weirdos = ".tar".split()
         name, ext = os.path.splitext(path)
-        while any(name.endswith(weirdo:=w) for w in weirdos):
-            if name != (name:=name.removesuffix(weirdo)): 
+        while any(name.endswith(weirdo := w) for w in weirdos):
+            if name != (name := name.removesuffix(weirdo)):
                 ext = weirdo + ext
         return name + self.format.format(index=index) + ext
+
+
 namespacer = NameSpacer()
 
-def trim(path:str, edge:str=os.sep) -> str:
+
+def trim(path: str, edge: str = os.sep) -> str:
     """
     Remove trailing/leading separators (or edges) from a path string
     """
     out = path[:]
     if sys.platform == 'win32':
-        while any(out.startswith(x) for x in (edge,' ')):
+        while any(out.startswith(x) for x in (edge, ' ')):
             out = out[1:]
-    while any(out.endswith(x) for x in (edge,' ')):
+    while any(out.endswith(x) for x in (edge, ' ')):
         out = out[:-1]
     return out
 
-def cat(path:str, text:bool=True, lines:bool=False, copy:bool=False) -> str|bytes|list[str|bytes]:
+
+def cat(
+    path: str, text: bool = True, lines: bool = False, copy: bool = False
+) -> str | bytes | list[str | bytes]:
     """
     Extract the text or bytes, if the keyword is set to false, from a file
     ::text::
@@ -91,7 +99,14 @@ def cat(path:str, text:bool=True, lines:bool=False, copy:bool=False) -> str|byte
             pc.copy(content) if copy else None
             return content
 
-def create_enter(*args:[str, Iterable[str]], go_back:bool=False, recursive:bool=True, overwrite:bool=True, exist_ok:bool=True) -> str:
+
+def create_enter(
+    *args: [str, Iterable[str]],
+    go_back: bool = False,
+    recursive: bool = True,
+    overwrite: bool = True,
+    exist_ok: bool = True,
+) -> str:
     """
     recursively create and enter directories.
     params:
@@ -112,25 +127,28 @@ def create_enter(*args:[str, Iterable[str]], go_back:bool=False, recursive:bool=
                         dir3
                     dir4
             dir5
-        
+
         >>> mcd('dir1 dir2 .. dir3 .. .. dir4 .. .. dir5'.split())
         >>> mcd('dir1/dir2 ../dir3 ../../dir4 ../../dir5'.split())
     """
     home = os.getcwd()
     for arg in flat(args):
-        arg = namespacer(arg) if arg!='..' and not overwrite else arg
+        arg = namespacer(arg) if arg != '..' and not overwrite else arg
         os.makedirs(arg, exist_ok=exist_ok)
         os.chdir(arg if recursive else home)
     last_stop = home if go_back else os.getcwd()
     os.chdir(last_stop)
     return last_stop
+
+
 mcd = create_enter
 
-def move(source:str, dest:str, make_dest:bool=False) -> str:
+
+def move(source: str, dest: str, make_dest: bool = False) -> str:
     """
     Move source to dest
     Return path to new version
-    
+
     Params
         source
             path to original file/folder
@@ -149,9 +167,14 @@ def move(source:str, dest:str, make_dest:bool=False) -> str:
     new = os.path.join(dest, name)
     os.rename(source, new)
     return new
+
+
 mv = move
 
-def move_file(file:str, dest:str, make_dest:bool=False, clone:bool=False) -> str:
+
+def move_file(
+    file: str, dest: str, make_dest: bool = False, clone: bool = False
+) -> str:
     """
     Move a file to a given directory
     This uses iteration to copy the file byte by byte.
@@ -167,17 +190,17 @@ def move_file(file:str, dest:str, make_dest:bool=False, clone:bool=False) -> str
     """
     if os.path.isdir(source):
         raise ValueError(f"Source path points to a directory")
-    
+
     dest = (os.path.realpath, str)[os.path.isabs(dest)](dest)
     if not os.path.isdir(dest):
         if not make_dest:
             raise ValueError(f"Destination path doesn't point to a directory")
         else:
             os.makedirs(dest, exist_ok=True)
-    
+
     root, name = os.path.split(path)
     new = os.path.join(dest, name)
-    
+
     with open(source, 'rb') as src:
         with open(new, 'wb') as dst:
             dst.write(src.read())
@@ -187,9 +210,10 @@ def move_file(file:str, dest:str, make_dest:bool=False, clone:bool=False) -> str
         warn("Could not remove file after copying due to PermissionError", Warning)
     return new
 
-def discard(path:str, recycle:bool=True) -> None:
+
+def discard(path: str, recycle: bool = True) -> None:
     """
-    Remove an address from the file-system. 
+    Remove an address from the file-system.
     Will fall back to recycle if recycle is False, but a permission error is raised, and vis-versa
     Params
         Path
@@ -203,9 +227,12 @@ def discard(path:str, recycle:bool=True) -> None:
         first(path)
     except PermissionError:
         backup(path)
+
+
 rm = discard
 
-def audio_or_video(path:str) -> bool:
+
+def audio_or_video(path: str) -> bool:
     """
     Check if a file is audio or video
     True if audio, False if video, else ValueError
@@ -216,11 +243,20 @@ def audio_or_video(path:str) -> bool:
         return True
     raise ValueError("Mime does not compute")
 
-def ffplay(files:Iterable[str], hide:bool=True, fullscreen:bool=True, loop:bool=True, quiet:bool=True, randomize:bool=True, silent:bool=False) -> None:
+
+def ffplay(
+    files: Iterable[str],
+    hide: bool = True,
+    fullscreen: bool = True,
+    loop: bool = True,
+    quiet: bool = True,
+    randomize: bool = True,
+    silent: bool = False,
+) -> None:
     """
     Play a collection of files using ffmpeg's "ffplay" cli
     Files can be passed as a single string of paths separated by asterisks
-    
+
     If entering files as a string, separate each path by an asterisk (*), othewise feel free to use any iterator
     -loop {f"-loop {loop}" if loop else ""}
     """
@@ -232,22 +268,30 @@ def ffplay(files:Iterable[str], hide:bool=True, fullscreen:bool=True, loop:bool=
     albumtrack = lambda file: bool(re.search(f'\d+\s.+{ext(file)}', file, re.I))
     attitle = lambda file: ' '.join(i.strip() for i in nome(file).split(' ')[1:])
     aov = lambda file: audio_or_video(file)
-    title = lambda file: ''.join(i for i in os.path.splitext(namext(file)[1])[0] if i not in '0123456789').strip()
-    windowtitle = lambda file: [namext(file), [attitle(file), vidtitle(file)][isvid(file)]][aov(file)]
-    play = lambda file: subprocess.run(f'ffplay {("", "-nodisp")[hide]} -window_title "{windowtitle(file)}" -autoexit {"-fs" if fullscreen else ""} {"-v error" if quiet else ""} "{file}"')
+    title = lambda file: ''.join(
+        i for i in os.path.splitext(namext(file)[1])[0] if i not in '0123456789'
+    ).strip()
+    windowtitle = lambda file: [
+        namext(file),
+        [attitle(file), vidtitle(file)][isvid(file)],
+    ][aov(file)]
+    play = lambda file: subprocess.run(
+        f'ffplay {("", "-nodisp")[hide]} -window_title "{windowtitle(file)}" -autoexit'
+        f' {"-fs" if fullscreen else ""} {"-v error" if quiet else ""} "{file}"'
+    )
     files = files.split('*') if isinstance(files, str) else files
     if loop:
-        while (1 if loop==True else loop+1):
+        while 1 if loop == True else loop + 1:
             files = shuffle(files) if randomize else files
-            for i,f in enumerate(files, 1):
+            for i, f in enumerate(files, 1):
                 if os.path.isdir(f):
                     fls = [os.path.join(f, i) for i in gather(f, names=False)]
-                    for j,file in enumerate(fls, 1):
+                    for j, file in enumerate(fls, 1):
                         name = os.path.split(file)[1]
                         print(f'{j} of {len(fls)}:\t{name}') if not silent else None
                         ffplay(file, hide, fullscreen, False, quiet, randomize, True)
                 else:
-                    folder,name = os.path.split(f)
+                    folder, name = os.path.split(f)
                     print(f'{i} of {len(files)}:\t{name}') if not silent else None
                     play(f)
             loop -= 1
@@ -264,9 +308,16 @@ def ffplay(files:Iterable[str], hide:bool=True, fullscreen:bool=True, loop:bool=
                 print(f'{i} of {len(files)}:\t{title(f)}') if not silent else None
                 play(f)
 
-def convert(file:str, format:str='wav', bitRate:int=450, delete:bool=False, options:str='') -> str:
+
+def convert(
+    file: str,
+    format: str = 'wav',
+    bitRate: int = 450,
+    delete: bool = False,
+    options: str = '',
+) -> str:
     """
-    Convert an audio file using FFMPEG. 
+    Convert an audio file using FFMPEG.
         Verbosity is minimized by default.
     Params
         file
@@ -281,16 +332,20 @@ def convert(file:str, format:str='wav', bitRate:int=450, delete:bool=False, opti
             additional options to pass to ffmpeg
     """
     os.chdir(os.path.split(file)[0])
-    
+
     _title = lambda file: file.split(os.sep)[-1].split('.')[0]
     _new = lambda file, format: namespacer(_title(file) + format)
     _name = lambda file: file.split(os.sep)[-1]
     format = '.' + format if '.' != format[0] else format
-    
+
     name = _title(file)
     new = _new(file, format)
-    
-    cmd = f'ffmpeg -y -i "{file}" -ab {bitRate*1000} "{new}"' if bitRate != 0 else f'ffmpeg {options} -y -i "{file}" "{new}"'
+
+    cmd = (
+        f'ffmpeg -y -i "{file}" -ab {bitRate*1000} "{new}"'
+        if bitRate != 0
+        else f'ffmpeg {options} -y -i "{file}" "{new}"'
+    )
     announcement = f"Converting:\n\t{file} --> {new}\n\t{cmd=}"
     print(announcement)
     subprocess.run(cmd)
@@ -300,33 +355,31 @@ def convert(file:str, format:str='wav', bitRate:int=450, delete:bool=False, opti
         print(f'Deletion is complete\n\t{new}\n\n\n')
     return new
 
-def unarchive(path:str, app:str='rar') -> str:
+
+def unarchive(path: str, app: str = 'rar') -> str:
     """
     Extract an archive to a chosen destination, or one generated based on the name of the archive
     App refers to the comandlet you wish to invoke via subprocess.run
-    
+
     """
     path = os.path.realpath(path)
     route, namext = os.path.split(path)
     name, ext = os.path.splitext(namext)
     dest = namespacer(os.path.join(route, name))
-    
-    options = {
-        'tar':'-x -f',
-        'rar':'e -or -r',
-        'winrar':'',
-    }
+
+    options = {'tar': '-x -f', 'rar': 'e -or -r', 'winrar': ''}
     cmd = f'{app} {options[app]} "{src}" '
-    
+
     os.makedirs(dest, exist_ok=True)
     os.chdir(dest)
-    
+
     subprocess.run(cmd)
     return dest
 
-def isempty(path:str, make:bool=False) -> bool:
+
+def isempty(path: str, make: bool = False) -> bool:
     """
-    Check if a given file or folder is empty or not with the option to create it if it doesn't exit 
+    Check if a given file or folder is empty or not with the option to create it if it doesn't exit
     """
     if os.path.isfile(path):
         with open(path, 'rb') as f:
